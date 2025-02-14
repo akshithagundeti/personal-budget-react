@@ -1,6 +1,148 @@
-import React from 'react'
+import axios from 'axios';
+import React, { useEffect, useState } from 'react';
+import Chart from 'chart.js/auto';
+import * as d3 from 'd3';
 
 function HomePage() {
+
+    const [budgetData, setBudgetData] = useState([]);
+    var dataSource = {
+        datasets: [
+          {
+            data: [],
+            backgroundColor: [
+              '#ffcd44',
+                            '#ff6382',
+                            '#36a2ea',
+                            '#00FF00',
+                            '#800080',
+                            '#FF0000',
+                            '#FFA500',
+                            '#FOFOFO'
+            ],
+          },
+        ],
+        labels: [],
+      };
+
+
+      const fetchData = async () => {
+        
+        axios.get('http://localhost:3001/budget')
+        .then( (res) => {
+            for (var i = 0; i < res.data.myBudget.length; i++) {
+                dataSource.datasets[0].data[i] = res.data.myBudget[i].budget;
+                dataSource.labels[i] = res.data.myBudget[i].title;
+              }
+            setBudgetData(res.data.myBudget);
+            console.log(res.data.myBudget);
+            createPieChart();
+            donutChart(res.data.myBudget);
+        } )
+        .catch( (err) => {
+            console.log( err );
+        })
+      };
+
+    useEffect(() => {
+        console.log("useEffect.!");
+        fetchData();
+    }, []);
+
+    function createPieChart(){
+        var ctx = document.getElementById("myChart").getContext("2d");
+        var myPieChart = new Chart(ctx, {
+            type: "pie",
+            data: dataSource
+        });        
+    }
+
+    const donutChart = (data) => {
+        const width = 400;
+        const height = 400;
+        const radius = Math.min(width, height) / 2;
+    
+        const svg = d3.select('#donut-chart')
+                      .append('svg')
+                      .attr('width', width)
+                      .attr('height', height)
+                      .append('g')
+                      .attr('transform', `translate(${width / 2},${height / 2})`);
+    
+        const color = d3.scaleOrdinal()
+                        .domain(data.map(d => d.title))
+                        .range(d3.schemeSet2);
+    
+        const pie = d3.pie()
+                      .value(d => d.budget)
+                      .sort(null);
+    
+        const arc = d3.arc()
+                      .innerRadius(radius * 0.3)
+                      .outerRadius(radius * 0.8);
+    
+        const outerArc = d3.arc()
+                           .innerRadius(radius * 0.85)
+                           .outerRadius(radius * 0.85);
+    
+        const arcs = svg.selectAll('arc')
+                        .data(pie(data))
+                        .enter()
+                        .append('g')
+                        .attr('class', 'arc');
+    
+        arcs.append('path')
+            .attr('d', arc)
+            .attr('fill', (d, i) => color(i))
+            .attr('class', 'slice');
+    
+        // Add labels with lines only on left side of the chart
+        arcs.filter(d => (d.endAngle + d.startAngle) / 2 < Math.PI)
+            .append('text')
+            .attr('transform', function(d) {
+                const pos = outerArc.centroid(d);
+                return 'translate(' + pos + ')';
+            })
+            .attr('dy', '.35em')
+            .style('text-anchor', 'start')
+            .text(d => d.data.title);
+    
+        arcs.filter(d => (d.endAngle + d.startAngle) / 2 < Math.PI)
+            .append('polyline')
+            .attr('stroke', 'black')
+            .attr('stroke-width', 1)
+            .attr('fill', 'none')
+            .attr('points', function(d) {
+                const pos = outerArc.centroid(d);
+                return [arc.centroid(d), outerArc.centroid(d), pos];
+            });
+    
+        // Add labels with lines only on right side of the chart
+        arcs.filter(d => (d.endAngle + d.startAngle) / 2 >= Math.PI)
+            .append('text')
+            .attr('transform', function(d) {
+                const pos = outerArc.centroid(d);
+                pos[0] = pos[0] - 10; // Adjust indentation for right side labels
+                return 'translate(' + pos + ')';
+            })
+            .attr('dy', '.35em')
+            .style('text-anchor', 'end')
+            .text(d => d.data.title);
+    
+        arcs.filter(d => (d.endAngle + d.startAngle) / 2 >= Math.PI)
+            .append('polyline')
+            .attr('stroke', 'black')
+            .attr('stroke-width', 1)
+            .attr('fill', 'none')
+            .attr('points', function(d) {
+                const pos = outerArc.centroid(d);
+                pos[0] = pos[0] - 10; // Adjust indentation for right side lines
+                return [arc.centroid(d), outerArc.centroid(d), pos];
+            });
+    
+    };
+
+
   return (
     <main className="center" id="main">
 
@@ -70,13 +212,13 @@ function HomePage() {
             <article>
                 <h1>Chart</h1>
                 <p>
-                    <canvas id="myChart" width="400" height="400" aria-label="Budget Chart" role="img"></canvas>
+                    <canvas id="myChart"></canvas>
                 </p>
             </article>
 
             <div>
                 <h1>Newly added D3.js chart</h1>
-                {/* <svg width="1000px", height="650px" style="margin: 5px;"></svg> */}
+                <svg id="donut-chart" style={{ height: 400, width: 450 }}></svg>
             </div>
 
         </div>
